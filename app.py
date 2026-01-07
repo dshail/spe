@@ -27,33 +27,29 @@ if "student_data_list" not in st.session_state:
 if "grading_results" not in st.session_state:
     st.session_state.grading_results = []
 
-# --- SIDEBAR ---
-# --- SIDEBAR ---
-with st.sidebar:
-    st.title("⚙️ Configuration")
-    
-    # Try to load secrets first
+# --- CONFIGURATION ---
+try:
+    datalab_key = st.secrets.get("DATALAB_API_KEY", "")
+    gemini_key = st.secrets.get("GEMINI_API_KEY", "")
+except FileNotFoundError:
+    datalab_key = ""
+    gemini_key = ""
+    st.error("Secrets file not found. Please set DATALAB_API_KEY and GEMINI_API_KEY in .streamlit/secrets.toml")
+
+if gemini_key:
+    genai.configure(api_key=gemini_key)
     try:
-        default_datalab = st.secrets.get("DATALAB_API_KEY", "")
-        default_gemini = st.secrets.get("GEMINI_API_KEY", "")
-    except FileNotFoundError:
-        default_datalab = ""
-        default_gemini = ""
-
-    datalab_key = st.text_input("Datalab API Key", value=default_datalab, type="password")
-    gemini_key = st.text_input("Gemini API Key", value=default_gemini, type="password")
-    
-    if gemini_key:
-        genai.configure(api_key=gemini_key)
-        try:
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            st.success("Gemini Configured")
-        except:
-            st.error("Invalid Gemini Key")
-            model = None
-    else:
+        model = genai.GenerativeModel("gemini-2.0-flash")
+    except:
+        st.error("Invalid Gemini Key in secrets")
         model = None
+else:
+    model = None
+    st.warning("GEMINI_API_KEY not found in secrets.")
 
+if not datalab_key:
+    st.warning("DATALAB_API_KEY not found in secrets.")
+    
 # --- MAIN APP ---
 st.title("📝 AI Exam Auto-Grader")
 st.markdown("Upload a solution rubric and student answer scripts to automatically grade them.")
