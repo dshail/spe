@@ -28,13 +28,22 @@ if "grading_results" not in st.session_state:
     st.session_state.grading_results = []
 
 # --- CONFIGURATION ---
+# Try to get keys from secrets (local dev) or env vars (deployment)
 try:
-    datalab_key = st.secrets.get("DATALAB_API_KEY", "")
-    gemini_key = st.secrets.get("GEMINI_API_KEY", "")
+    datalab_key = st.secrets.get("DATALAB_API_KEY")
+    gemini_key = st.secrets.get("GEMINI_API_KEY")
 except FileNotFoundError:
-    datalab_key = ""
-    gemini_key = ""
-    st.error("Secrets file not found. Please set DATALAB_API_KEY and GEMINI_API_KEY in .streamlit/secrets.toml")
+    datalab_key = None
+    gemini_key = None
+
+# Fallback to os.environ if not in secrets
+if not datalab_key:
+    datalab_key = os.environ.get("DATALAB_API_KEY", "")
+if not gemini_key:
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+
+if not datalab_key or not gemini_key:
+    st.warning("⚠️ API Keys missing. Please set DATALAB_API_KEY and GEMINI_API_KEY in .streamlit/secrets.toml or as Environment Variables.")
 
 if gemini_key:
     genai.configure(api_key=gemini_key)
