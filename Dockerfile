@@ -1,5 +1,5 @@
 # Base image
-FROM python:3.9-slim
+FROM python:3.9-slim-bookworm
 
 # Set working directory
 WORKDIR /app
@@ -8,7 +8,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
