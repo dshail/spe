@@ -58,6 +58,45 @@ else:
 
 if not datalab_key:
     st.warning("DATALAB_API_KEY not found in secrets.")
+
+# --- SIDEBAR: SESSION MANAGEMENT ---
+with st.sidebar:
+    st.header("💾 Session Manager")
+    st.info("Upload previously downloaded JSON files to restore your session.")
+    
+    uploaded_states = st.file_uploader("Restore Session Data", type=["json"], accept_multiple_files=True)
+    
+    if uploaded_states:
+        for state_file in uploaded_states:
+            try:
+                data = json.load(state_file)
+                
+                # Detect Rubric
+                if isinstance(data, dict) and "exam_metadata" in data and "questions" in data:
+                    st.session_state.rubric_data = data
+                    st.toast(f"✅ Restored Rubric: {data.get('exam_metadata', {}).get('exam_name')}")
+                
+                # Detect Student List
+                elif isinstance(data, list) and len(data) > 0 and "student_metadata" in data[0]:
+                     st.session_state.student_data_list = data
+                     st.toast(f"✅ Restored {len(data)} Student Scripts")
+                
+                # Detect Single Student (if uploaded individually)
+                elif isinstance(data, dict) and "student_metadata" in data:
+                     # Check if exists
+                     exists = any(s.get("student_metadata", {}).get("roll_number") == data.get("student_metadata", {}).get("roll_number") for s in st.session_state.student_data_list)
+                     if not exists:
+                         st.session_state.student_data_list.append(data)
+                         st.toast(f"✅ Restored Student: {data.get('student_metadata', {}).get('student_name')}")
+                     
+            except Exception as e:
+                st.error(f"Error reading {state_file.name}: {e}")
+    
+    if st.button("Clear All Session Data"):
+        st.session_state.rubric_data = None
+        st.session_state.student_data_list = []
+        st.session_state.grading_results = []
+        st.rerun()
     
 # --- MAIN APP ---
 st.title("📝 AI Exam Auto-Grader")
