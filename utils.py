@@ -94,7 +94,7 @@ STUDENT_EXTRACTION_SCHEMA = {
         },
         "answers": {
             "type": "array",
-            "description": "Complete student answers with text & math (exclude crossed-out work)",
+            "description": "Complete student answers with text & math. CRITICAL: STRICTLY IGNORE and EXCLUDE any text that is crossed out, struck through, or explicitly cancelled by the student.",
             "items": {
                 "type": "object",
                 "properties": {
@@ -104,7 +104,7 @@ STUDENT_EXTRACTION_SCHEMA = {
                     "section_group": {"type": "string", "description": "Detected section grouping"},
                     "answer_text_plain": {
                         "type": "string",
-                        "description": "Student answer. WRAP ALL MATH EXPRESSIONS IN $...$ delimiters for LaTeX rendering."
+                        "description": "Student answer. WRAP ALL MATH EXPRESSIONS IN $...$ delimiters for LaTeX rendering. DO NOT include text that has been crossed out or struck through."
                     },
                     "figure_summary_student": {"type": "string", "description": "Textual description of student-drawn diagram"},
                     "status": {"type": "string", "description": "Attempted, Blank, or Partial"}
