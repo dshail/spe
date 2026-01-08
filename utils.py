@@ -7,8 +7,82 @@ import pandas as pd
 
 import google.generativeai as genai
 import asyncio
+import datetime
+import glob
 
-# --- SCHEMAS ---
+# --- HISTORY MANAGEMENT ---
+
+HISTORY_DIR = "history"
+
+def save_to_history(data, category, filename_prefix):
+    """
+    Save data to history/{category}/timestamp_{filename_prefix}.json
+    Returns the absolute path of the saved file.
+    """
+    try:
+        # Create category directory
+        cat_dir = os.path.join(HISTORY_DIR, category)
+        os.makedirs(cat_dir, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_prefix = "".join(x for x in filename_prefix if x.isalnum() or x in ('-', '_')).strip()
+        filename = f"{timestamp}_{safe_prefix}.json"
+        filepath = os.path.join(cat_dir, filename)
+        
+        # Save JSON
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+            
+        return filepath
+    except Exception as e:
+        print(f"Error saving to history: {e}")
+        return None
+
+def list_history_files(category):
+    """
+    List all JSON files in history/{category} sorted by newest first.
+    Returns list of dicts: {'filename': str, 'path': str, 'timestamp': str}
+    """
+    cat_dir = os.path.join(HISTORY_DIR, category)
+    if not os.path.exists(cat_dir):
+        return []
+        
+    files = []
+    # Use glob to find json files
+    for filepath in glob.glob(os.path.join(cat_dir, "*.json")):
+        filename = os.path.basename(filepath)
+        # Try to extract timestamp
+        parts = filename.split('_')
+        timestamp_str = "Unknown"
+        if len(parts) >= 2:
+            try:
+                # format YYYYMMDD_HHMMSS
+                ts_part = parts[0] + "_" + parts[1]
+                dt = datetime.datetime.strptime(ts_part, "%Y%m%d_%H%M%S")
+                timestamp_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+            except:
+                timestamp_str = "Unknown"
+                
+        files.append({
+            'filename': filename,
+            'path': filepath,
+            'timestamp': timestamp_str,
+            'mod_time': os.path.getmtime(filepath)
+        })
+    
+    # Sort by modification time, newest first
+    files.sort(key=lambda x: x['mod_time'], reverse=True)
+    return files
+
+def load_history_file(category, filename):
+    """Load content of a specific history file"""
+    filepath = os.path.join(HISTORY_DIR, category, filename)
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        return None
 
 RUBRIC_EXTRACTION_SCHEMA = {
     "type": "object",

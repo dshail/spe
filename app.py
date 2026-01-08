@@ -14,7 +14,10 @@ from utils import (
     evaluate_single_answer,
     postprocess_evaluation,
     normalize_qno,
-    safe_get_string
+    safe_get_string,
+    save_to_history,
+    list_history_files,
+    load_history_file
 )
 
 st.set_page_config(page_title="Auto-Grader AI", layout="wide")
@@ -92,11 +95,51 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Error reading {state_file.name}: {e}")
     
+    
     if st.button("Clear All Session Data"):
         st.session_state.rubric_data = None
         st.session_state.student_data_list = []
         st.session_state.grading_results = []
         st.rerun()
+
+    st.divider()
+    
+    # --- HISTORY VIEWER ---
+    st.header("📜 History Viewer")
+    st.info("View and download auto-saved files from this server session. (Cloud: Cleared on restart)")
+    
+    hist_type = st.selectbox("Select Category", ["Rubrics", "Students", "Grading"], key="hist_cat")
+    
+    category_map = {
+        "Rubrics": "rubrics",
+        "Students": "students",
+        "Grading": "grading"
+    }
+    
+    selected_cat = category_map[hist_type]
+    files = list_history_files(selected_cat)
+    
+    if files:
+        file_options = {f"{f['timestamp']} - {f['filename']}": f['filename'] for f in files}
+        selected_file_label = st.selectbox("Select File", list(file_options.keys()), key="hist_file_sel")
+        
+        if selected_file_label:
+            real_filename = file_options[selected_file_label]
+            if st.button(f"Load {hist_type} Preview"):
+                data = load_history_file(selected_cat, real_filename)
+                if data:
+                    st.json(data, expanded=False)
+                    st.download_button(
+                        label="📥 Download JSON",
+                        data=json.dumps(data, indent=2),
+                        file_name=real_filename,
+                        mime="application/json"
+                    )
+                else:
+                    st.error("File not found or empty.")
+    else:
+        st.caption("No history found for this category.")
+
     
 # --- MAIN APP ---
 st.title("📝 AI Exam Auto-Grader")
@@ -127,6 +170,12 @@ with tab1:
                     if rubric:
                         rubric = normalize_step_marking(rubric)
                         st.session_state.rubric_data = rubric
+                        
+                        # Auto-save Rubric
+                        saved_path = save_to_history(rubric, "rubrics", "rubric_extracted")
+                        if saved_path:
+                            st.toast(f"💾 Rubric auto-saved to history.")
+
                         st.success("✅ Rubric Extracted Successfully!")
                         st.json(rubric.get("exam_metadata", {}))
                         
@@ -203,6 +252,11 @@ with tab2:
                     if data:
                         data['filename'] = stu_file.name
                         st.session_state.student_data_list.append(data)
+                        
+                        # Auto-save Student
+                        s_name = data.get('student_metadata', {}).get('student_name', 'unknown')
+                        save_to_history(data, "students", f"student_{s_name}")
+                        
                         st.write(f"✅ Extracted: {data.get('student_metadata', {}).get('student_name', 'Unknown')}")
                         
                         with st.expander("View Extracted Student Answers"):
@@ -297,6 +351,11 @@ with tab3:
                     bar.progress(min(completed_ops / total_ops, 1.0))
             
             st.session_state.grading_results = all_evals
+            
+            # Auto-save Results
+            save_to_history(all_evals, "grading", "grading_results")
+            st.toast("💾 Grading results auto-saved to history.")
+            
             st.success("Grading Complete!")
             
     # RESULTS DISPLAY
