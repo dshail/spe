@@ -128,15 +128,16 @@ RUBRIC_EXTRACTION_SCHEMA = {
         },
         "section_info": {
             "type": "array",
-            "description": "Section-wise metadata",
+            "description": "Detailed section-wise metadata and evaluation rules",
             "items": {
                 "type": "object",
                 "properties": {
                     "section_name": {"type": "string"},
-                    "question_range": {"type": "string"},
-                    "answer_requirement": {"type": "string"},
-                    "marks_per_question": {"type": "string"},
-                    "answer_length_limit": {"type": "string"}
+                    "section_instructions": {"type": "string", "description": "Specific instructions like 'Attempt any 2 questions' or 'All questions are compulsory'."},
+                    "attempt_count_required": {"type": "integer", "description": "Number of questions student is REQUIRED to attempt in this section. If not specified, assume all."},
+                    "total_marks_section": {"type": "number", "description": "Total marks allocated to this entire section"},
+                    "marks_per_question": {"type": "number", "description": "Marks for each question in this section (if uniform)"},
+                    "has_internal_choice": {"type": "boolean", "description": "True if there are 'OR' choices between questions within this section"}
                 }
             }
         },
@@ -146,6 +147,16 @@ RUBRIC_EXTRACTION_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "question_no": {"type": "string"},
+                    "question_hierarchy": {
+                        "type": "object",
+                        "description": "Structure for sub-questions (e.g. 1a, 1b)",
+                        "properties": {
+                            "is_sub_question": {"type": "boolean", "description": "True if this is a part of a larger question (e.g. 1a)"},
+                            "main_question_no": {"type": "string", "description": "The parent question number (e.g. '1' if this is '1a')"},
+                            "sub_part_label": {"type": "string", "description": "The part label (e.g. 'a', 'ii')"}
+                        }
+                    },
+                    "is_part_of_choice": {"type": "boolean", "description": "True if this question is part of an 'Either/Or' choice grouping"},
                     "section": {"type": "string"},
                     "question_type": {"type": "string"},
                     "difficulty_level": {"type": "string"},
@@ -519,3 +530,103 @@ def postprocess_evaluation(eval_result, max_marks):
     except:
         eval_result["status"] = "Error"
     return eval_result
+
+def apply_grading_rules(student_evals, rubric):
+    """
+    Apply section-wise constraints (e.g. "Attempt 3 of 5") to student evaluations.
+    Marks extra questions as 'is_excluded=True' and status='Extra'.
+    """
+    if not student_evals or not rubric:
+        return student_evals
+
+    # 1. Build Question Registry (Map QNo -> Section, MainID)
+    q_map = {}
+    for q in rubric.get("questions", []):
+        q_no = normalize_qno(q.get("question_no"))
+        
+        # Hierarchy info
+        hierarchy = q.get("question_hierarchy", {})
+        is_sub = hierarchy.get("is_sub_question", False)
+        main_id = hierarchy.get("main_question_no")
+        
+        # Fallback if hierarchy missing but "1a" pattern exists? 
+        # For now rely on schema. if missing, MainID = QNo
+        if not main_id:
+             main_id = q_no
+             
+        q_map[q_no] = {
+            "section": q.get("section", "Default"),
+            "main_id": normalize_qno(main_id),
+            "is_sub": is_sub
+        }
+
+    # 2. Group Student Evals by Section -> MainID
+    # Structure: sections[section_name][main_id] = [eval1, eval2...]
+    sections = {}
+    
+    for eval_item in student_evals:
+        q_no = normalize_qno(eval_item.get("question_no"))
+        
+        # Default to unknown if not in rubric (shouldn't happen often)
+        info = q_map.get(q_no, {"section": "Default", "main_id": q_no})
+        
+        sec_name = info["section"]
+        main_id = info["main_id"]
+        
+        if sec_name not in sections:
+            sections[sec_name] = {}
+        if main_id not in sections[sec_name]:
+            sections[sec_name][main_id] = []
+            
+        sections[sec_name][main_id].append(eval_item)
+
+    # 3. Process Each Section
+    rubric_sections = rubric.get("section_info", [])
+    # Flatten rubric sections for easy lookup
+    sec_rules = {s.get("section_name"): s for s in rubric_sections}
+
+    for sec_name, main_questions in sections.items():
+        pass_rule = sec_rules.get(sec_name)
+        
+        # Determine allowed count
+        allowed_count = 9999
+        if pass_rule:
+             # Look for attempt_count_required
+             try:
+                 req = int(pass_rule.get("attempt_count_required", 0))
+                 if req > 0:
+                     allowed_count = req
+             except:
+                 pass
+        
+        # Calculate score for each Main Question
+        # List of (main_id, total_score, evaluatons_list)
+        scored_mains = []
+        
+        for m_id, evals in main_questions.items():
+            m_score = 0
+            for e in evals:
+                try:
+                    m_score += float(e.get("marks_awarded", 0))
+                except:
+                    pass
+            scored_mains.append({
+                "main_id": m_id,
+                "score": m_score,
+                "evals": evals
+            })
+            
+        # Sort by Score Descending
+        scored_mains.sort(key=lambda x: x["score"], reverse=True)
+        
+        # Mark Best N as Counted, Rest as Extra
+        for idx, item in enumerate(scored_mains):
+            is_counted = idx < allowed_count
+            
+            for e in item["evals"]:
+                e["is_excluded"] = not is_counted
+                if not is_counted:
+                    e["original_status"] = e.get("status")
+                    e["status"] = "Extra (Not Counted)"
+                    
+    return student_evals

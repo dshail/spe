@@ -19,7 +19,8 @@ from utils import (
     list_history_files,
     load_history_file,
     delete_history_file,
-    clear_history_category
+    clear_history_category,
+    apply_grading_rules
 )
 
 st.set_page_config(page_title="Auto-Grader AI", layout="wide")
@@ -376,10 +377,14 @@ with tab3:
                     eval_res["question_text"] = q_ref.get("question_text_plain")
                     eval_res["student_answer"] = ans_text
                     
-                    all_evals.append(eval_res)
+                    student_evals.append(eval_res)
                     
                     completed_ops += 1
                     bar.progress(min(completed_ops / total_ops, 1.0))
+                
+                # Apply Section Rules (Best N)
+                student_evals = apply_grading_rules(student_evals, rubric)
+                all_evals.extend(student_evals)
             
             st.session_state.grading_results = all_evals
             
@@ -439,9 +444,13 @@ with tab3:
             
             # Calculate Student Score
             student_score = 0
-            for marks in student_df["marks_awarded"]:
+            # Calculate Student Score
+            student_score = 0
+            for idx, row in student_df.iterrows():
+                if row.get("is_excluded"):
+                    continue
                 try:
-                    student_score += float(marks)
+                    student_score += float(row.get("marks_awarded", 0))
                 except:
                     pass
             
@@ -526,6 +535,7 @@ with tab3:
                 tot_score = 0
                 tot_max = 0
                 for _, r in subset.iterrows():
+                    if r.get("is_excluded"): continue
                     try: tot_score += float(r.get("marks_awarded", 0))
                     except: pass
                     try: tot_max += float(r.get("max_marks", 0))
@@ -536,8 +546,8 @@ with tab3:
                     "Student Name": s_meta.get("student_name", "Unknown"),
                     "Roll Number": s_meta.get("student_roll", ""),
                     "Total Score": tot_score,
-                    "Max Marks": tot_max,
-                    "Percentage": f"{(tot_score/tot_max*100):.2f}%" if tot_max > 0 else "0%"
+                    "Max Marks": display_total if display_total > 0 else tot_max,
+                    "Percentage": f"{(tot_score/display_total*100):.2f}%" if display_total > 0 else (f"{(tot_score/tot_max*100):.2f}%" if tot_max > 0 else "0%")
                 })
         
         summary_df = pd.DataFrame(summary_rows)
