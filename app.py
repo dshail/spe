@@ -87,10 +87,10 @@ with st.sidebar:
                 # Detect Single Student (if uploaded individually)
                 elif isinstance(data, dict) and "student_metadata" in data:
                      # Check if exists
-                     exists = any(s.get("student_metadata", {}).get("roll_number") == data.get("student_metadata", {}).get("roll_number") for s in st.session_state.student_data_list)
+                     exists = any((s.get("student_metadata") or {}).get("roll_number") == (data.get("student_metadata") or {}).get("roll_number") for s in st.session_state.student_data_list)
                      if not exists:
                          st.session_state.student_data_list.append(data)
-                         st.toast(f"✅ Restored Student: {data.get('student_metadata', {}).get('student_name')}")
+                         st.toast(f"✅ Restored Student: {(data.get('student_metadata') or {}).get('student_name')}")
                      
             except Exception as e:
                 st.error(f"Error reading {state_file.name}: {e}")
@@ -254,10 +254,10 @@ with tab2:
                         st.session_state.student_data_list.append(data)
                         
                         # Auto-save Student
-                        s_name = data.get('student_metadata', {}).get('student_name', 'unknown')
+                        s_name = (data.get('student_metadata') or {}).get('student_name', 'unknown')
                         save_to_history(data, "students", f"student_{s_name}")
                         
-                        st.write(f"✅ Extracted: {data.get('student_metadata', {}).get('student_name', 'Unknown')}")
+                        st.write(f"✅ Extracted: {(data.get('student_metadata') or {}).get('student_name', 'Unknown')}")
                         
                         with st.expander("View Extracted Student Answers"):
                             for ans in data.get("answers", []):
@@ -316,7 +316,7 @@ with tab3:
                 student_evals = []
                 stu_answers = {normalize_qno(a.get("question_no")): a for a in student.get("answers", [])}
                 
-                st.write(f"Grading **{student.get('student_metadata', {}).get('student_name', 'Unknown')}**...")
+                st.write(f"Grading **{(student.get('student_metadata') or {}).get('student_name', 'Unknown')}**...")
                 
                 for q_ref in rubric.get("questions", []):
                     qno = normalize_qno(q_ref.get("question_no"))
@@ -340,8 +340,8 @@ with tab3:
                     eval_res = postprocess_evaluation(eval_res, q_ref.get("max_marks"))
                     
                     # Add metadata
-                    eval_res["student_name"] = student.get("student_metadata", {}).get("student_name")
-                    eval_res["student_roll"] = student.get("student_metadata", {}).get("roll_number")
+                    eval_res["student_name"] = (student.get("student_metadata") or {}).get("student_name")
+                    eval_res["student_roll"] = (student.get("student_metadata") or {}).get("roll_number")
                     eval_res["question_text"] = q_ref.get("question_text_plain")
                     eval_res["student_answer"] = ans_text
                     
