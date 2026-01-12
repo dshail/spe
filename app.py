@@ -350,6 +350,7 @@ with tab3:
                     # Add metadata
                     eval_res["student_name"] = (student.get("student_metadata") or {}).get("student_name")
                     eval_res["student_roll"] = (student.get("student_metadata") or {}).get("roll_number")
+                    eval_res["filename"] = student.get("filename", "Unknown") # Add filename
                     eval_res["question_text"] = q_ref.get("question_text_plain")
                     eval_res["student_answer"] = ans_text
                     
@@ -404,11 +405,15 @@ with tab3:
         if metadata_total > 0 and calculated_total > 0 and abs(metadata_total - calculated_total) > 1.0:
              st.warning(f"⚠️ Note: Rubric Metadata states Total Marks = {metadata_total}, but sum of extracted questions = {calculated_total}. Using Metadata value for display.")
         
-        # Get unique students
-        student_names = df["student_name"].unique()
+        # Get unique filenames (more reliable than names)
+        unique_filenames = df["filename"].unique()
         
-        for student_name in student_names:
-            student_df = df[df["student_name"] == student_name]
+        for filename in unique_filenames:
+            student_df = df[df["filename"] == filename]
+            
+            # Get student name from the first record for this file
+            student_name_extracted = student_df.iloc[0].get("student_name", "Unknown")
+            
             
             # Calculate Student Score
             student_score = 0
@@ -419,7 +424,9 @@ with tab3:
                     pass
             
             st.divider()
-            st.markdown(f"### 🎓 Results for: {student_name}")
+            st.divider()
+            st.markdown(f"### 🎓 File: {filename}")
+            st.caption(f"**Student Name Detected:** {student_name_extracted}")
             
             # Score Summary
             col1, col2, col3 = st.columns(3)
@@ -430,9 +437,9 @@ with tab3:
                 st.download_button(
                     label="📥 Download CSV",
                     data=csv,
-                    file_name=f"{student_name}_results.csv",
+                    file_name=f"{filename}_results.csv",
                     mime="text/csv",
-                    key=f"csv_{student_name}"
+                    key=f"csv_{filename}"
                 )
             with col3:
                  # Prepare nested JSON for download
@@ -440,9 +447,9 @@ with tab3:
                  st.download_button(
                     label="📥 Download JSON",
                     data=student_json,
-                    file_name=f"{student_name}_results.json",
+                    file_name=f"{filename}_results.json",
                     mime="application/json",
-                    key=f"json_{student_name}"
+                    key=f"json_{filename}"
                  )
 
             # Detailed Breakdown (Readable UI)
