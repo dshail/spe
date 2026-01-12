@@ -514,11 +514,42 @@ with tab3:
 
         # Global Downloads (All Students)
         st.subheader("📦 Bulk Actions")
-        col_b1, col_b2 = st.columns(2)
+        
+        # Prepare Summary Data
+        summary_rows = []
+        for filename in unique_filenames:
+            subset = df[df["filename"] == filename]
+            if not subset.empty:
+                s_meta = subset.iloc[0]
+                
+                # Calculate totals safely
+                tot_score = 0
+                tot_max = 0
+                for _, r in subset.iterrows():
+                    try: tot_score += float(r.get("marks_awarded", 0))
+                    except: pass
+                    try: tot_max += float(r.get("max_marks", 0))
+                    except: pass
+                
+                summary_rows.append({
+                    "Filename": filename,
+                    "Student Name": s_meta.get("student_name", "Unknown"),
+                    "Roll Number": s_meta.get("student_roll", ""),
+                    "Total Score": tot_score,
+                    "Max Marks": tot_max,
+                    "Percentage": f"{(tot_score/tot_max*100):.2f}%" if tot_max > 0 else "0%"
+                })
+        
+        summary_df = pd.DataFrame(summary_rows)
+
+        col_b1, col_b2, col_b3 = st.columns(3)
         with col_b1:
             all_csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("Download All Results (CSV)", all_csv, "all_results.csv", "text/csv")
+            st.download_button("Download Detailed CSV", all_csv, "all_results_detailed.csv", "text/csv")
         with col_b2:
+            summary_csv = summary_df.to_csv(index=False).encode('utf-8')
+            st.download_button("Download Summary Report", summary_csv, "summary_report.csv", "text/csv")
+        with col_b3:
             all_json = df.to_json(orient="records", indent=2)
-            st.download_button("Download All Results (JSON)", all_json, "all_results.json", "application/json")
+            st.download_button("Download All JSON", all_json, "all_results.json", "application/json")
         
