@@ -177,31 +177,6 @@ with tab1:
                             st.toast(f"💾 Rubric auto-saved to history.")
 
                         st.success("✅ Rubric Extracted Successfully!")
-                        st.json(rubric.get("exam_metadata", {}))
-                        
-                        # Show Schema
-                        questions = rubric.get("questions", [])
-                        st.info(f"Found {len(questions)} questions in rubric.")
-
-                        with st.expander("View Extracted Rubric Details"):
-                            for q in questions:
-                                st.markdown(f"**Q{q.get('question_no')} ({q.get('max_marks')} marks)**")
-                                # Prefer LaTeX if available, else plain text
-                                q_text = q.get("question_math_latex") or q.get("question_text_plain")
-                                st.markdown(q_text)
-                                
-                                st.caption("Reference Answer:")
-                                ans_text = q.get("correct_answer_latex") or q.get("correct_answer_plain")
-                                st.markdown(ans_text)
-
-                                if q.get("step_marking"):
-                                    st.caption("Step-wise Marking Scheme:")
-                                    for step in q.get("step_marking"):
-                                        marks = step.get("marksplit", 0)
-                                        desc = step.get("step_wise_answer", "")
-                                        if desc:
-                                            st.markdown(f"• **[{marks} Marks]** {desc}")
-                                st.divider()
                     else:
                         st.error("Failed to parse rubric JSON.")
                 else:
@@ -222,6 +197,33 @@ with tab1:
             file_name="rubric_extracted.json",
             mime="application/json"
         )
+        
+        # Persistent Display
+        rubric = st.session_state.rubric_data
+        st.json(rubric.get("exam_metadata", {}))
+        
+        questions = rubric.get("questions", [])
+        st.info(f"Found {len(questions)} questions in rubric.")
+
+        with st.expander("View Extracted Rubric Details"):
+            for q in questions:
+                st.markdown(f"**Q{q.get('question_no')} ({q.get('max_marks')} marks)**")
+                # Prefer LaTeX if available, else plain text
+                q_text = q.get("question_math_latex") or q.get("question_text_plain")
+                st.markdown(q_text)
+                
+                st.caption("Reference Answer:")
+                ans_text = q.get("correct_answer_latex") or q.get("correct_answer_plain")
+                st.markdown(ans_text)
+
+                if q.get("step_marking"):
+                    st.caption("Step-wise Marking Scheme:")
+                    for step in q.get("step_marking"):
+                        marks = step.get("marksplit", 0)
+                        desc = step.get("step_wise_answer", "")
+                        if desc:
+                            st.markdown(f"• **[{marks} Marks]** {desc}")
+                st.divider()
 
 # --- TAB 2: STUDENTS ---
 with tab2:
@@ -258,15 +260,6 @@ with tab2:
                         save_to_history(data, "students", f"student_{s_name}")
                         
                         st.write(f"✅ Extracted: {(data.get('student_metadata') or {}).get('student_name', 'Unknown')}")
-                        
-                        with st.expander("View Extracted Student Answers"):
-                            for ans in data.get("answers", []):
-                                st.markdown(f"**Q{ans.get('question_no')}**")
-                                st.markdown(ans.get("answer_text_plain", "No text extracted"))
-                                if ans.get("figure_summary_student"):
-                                    st.caption("Figure Summary:")
-                                    st.info(ans.get("figure_summary_student"))
-                                st.divider()
                     else:
                         st.warning(f"Failed to parse {stu_file.name}")
                 else:
@@ -291,6 +284,21 @@ with tab2:
             file_name="students_extracted.json",
             mime="application/json"
         )
+
+        st.divider()
+        st.subheader("Student Answer Previews")
+        for s_data in st.session_state.student_data_list:
+            s_name = (s_data.get('student_metadata') or {}).get('student_name', 'Unknown')
+            s_file = s_data.get('filename', 'Unknown File')
+            
+            with st.expander(f"📄 {s_name} ({s_file})"):
+                for ans in s_data.get("answers", []):
+                    st.markdown(f"**Q{ans.get('question_no')}**")
+                    st.markdown(ans.get("answer_text_plain", "No text extracted"))
+                    if ans.get("figure_summary_student"):
+                        st.caption("Figure Summary:")
+                        st.info(ans.get("figure_summary_student"))
+                    st.divider()
 
 # --- TAB 3: GRADING ---
 with tab3:
