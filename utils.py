@@ -181,7 +181,7 @@ RUBRIC_EXTRACTION_SCHEMA = {
 
 STUDENT_EXTRACTION_SCHEMA = {
     "type": "object",
-    "description": "Student exam answers with complete math, figure, and metadata support",
+    "description": "Student exam answers with complete text, math, figure, and metadata support",
     "properties": {
         "student_metadata": {
             "type": "object",
@@ -204,9 +204,9 @@ STUDENT_EXTRACTION_SCHEMA = {
                     "section_group": {"type": "string", "description": "Detected section grouping"},
                     "answer_text_plain": {
                         "type": "string",
-                        "description": "Student answer. WRAP ALL MATH EXPRESSIONS IN $...$ delimiters. Pay close attention to small details like fractions (e.g. /2), subscripts, and superscripts. DO NOT include text that has been crossed out or struck through."
+                        "description": "Student answer. WRAP ALL MATH EXPRESSIONS IN $...$ delimiters. Pay close attention to small details like fractions (e.g. /2), subscripts, and superscripts. DO NOT include the text that has been crossed out or struck through."
                     },
-                    "figure_summary_student": {"type": "string", "description": "Textual description of student-drawn diagram"},
+                    "figure_summary_student": {"type": "string", "description": "Detailed textual description of student-drawn diagram"},
                     "status": {"type": "string", "description": "Attempted, Blank, or Partial"}
                 }
             }
@@ -217,7 +217,7 @@ STUDENT_EXTRACTION_SCHEMA = {
 # --- HELPER FUNCTIONS ---
 
 def normalize_qno(qno: str) -> str:
-    """Normalize question numbers: Q1., 1., 1) -> 1"""
+    """Normalize question numbers: Q1., 1., 1, 1), 1i, 1I, 1ii, 1ii), Q1I, Q1i), i) -> 1"""
     if not qno:
         return ""
     q = str(qno).strip()
@@ -447,7 +447,7 @@ def evaluate_single_answer(model, question_ref, student_answer_text, student_sta
             "status": "Blank"
         }
 
-    eval_prompt = f"""You are an STEM subject expert examiner grading subjective & objective student answer for questions using detailed rubric.
+    eval_prompt = f"""You are an STEM and the Humanities subject expert examiner grading subjective & objective student answer for questions using detailed rubric.
 
 ==QUESTION DETAILS==
 Question No: {safe_get_string(question_ref, 'question_no')}
