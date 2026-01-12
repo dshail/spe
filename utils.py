@@ -84,6 +84,32 @@ def load_history_file(category, filename):
     except Exception as e:
         return None
 
+def delete_history_file(category, filename):
+    """Delete a specific history file"""
+    filepath = os.path.join(HISTORY_DIR, category, filename)
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            return True
+        return False
+    except Exception as e:
+        print(f"Error deleting file: {e}")
+        return False
+
+def clear_history_category(category):
+    """Delete all files in a category"""
+    cat_dir = os.path.join(HISTORY_DIR, category)
+    if not os.path.exists(cat_dir):
+        return True
+        
+    try:
+        for filepath in glob.glob(os.path.join(cat_dir, "*.json")):
+            os.remove(filepath)
+        return True
+    except Exception as e:
+        print(f"Error clearing category: {e}")
+        return False
+
 RUBRIC_EXTRACTION_SCHEMA = {
     "type": "object",
     "description": "Complete grading rubric with step-wise marking breakdown",

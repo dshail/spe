@@ -17,7 +17,9 @@ from utils import (
     safe_get_string,
     save_to_history,
     list_history_files,
-    load_history_file
+    load_history_file,
+    delete_history_file,
+    clear_history_category
 )
 
 st.set_page_config(page_title="Auto-Grader AI", layout="wide")
@@ -125,18 +127,38 @@ with st.sidebar:
         
         if selected_file_label:
             real_filename = file_options[selected_file_label]
-            if st.button(f"Load {hist_type} Preview"):
-                data = load_history_file(selected_cat, real_filename)
-                if data:
-                    st.json(data, expanded=False)
-                    st.download_button(
-                        label="📥 Download JSON",
-                        data=json.dumps(data, indent=2),
-                        file_name=real_filename,
-                        mime="application/json"
-                    )
-                else:
-                    st.error("File not found or empty.")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button(f"Load {hist_type} Preview"):
+                    data = load_history_file(selected_cat, real_filename)
+                    if data:
+                        st.json(data, expanded=False)
+                        st.download_button(
+                            label="📥 Download JSON",
+                            data=json.dumps(data, indent=2),
+                            file_name=real_filename,
+                            mime="application/json"
+                        )
+                    else:
+                        st.error("File not found or empty.")
+            
+            with c2:
+                if st.button("🗑️ Delete File", type="primary"):
+                    if delete_history_file(selected_cat, real_filename):
+                        st.toast(f"Deleted {real_filename}")
+                        st.rerun()
+                    else:
+                        st.error("Failed to delete file.")
+                        
+        st.divider()
+        if st.button(f"🗑️ Clear All {hist_type} History", type="primary"):
+             if clear_history_category(selected_cat):
+                 st.toast(f"Cleared all {hist_type} history.")
+                 st.rerun()
+             else:
+                 st.error("Failed to clear history.")
+                 
     else:
         st.caption("No history found for this category.")
 
