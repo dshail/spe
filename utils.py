@@ -198,10 +198,10 @@ STUDENT_EXTRACTION_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "question_no": {"type": "string", "description": "Normalized question number"},
+                    "question_no": {"type": "string", "description": "Normalized question number: Q1., 1., 1, 1), 1i, 1I, 1ii, 1ii), Q1I, Q1i), i) -> 1"},
                     "page_number": {"type": "string", "description": "Page where answer appears"},
                     "answer_sequence_position": {"type": "string", "description": "Position in student's writing order"},
-                    "section_group": {"type": "string", "description": "Detected section grouping"},
+                    "section_group": {"type": "string", "description": "Detected section grouping "},
                     "answer_text_plain": {
                         "type": "string",
                         "description": "Student answer. WRAP ALL MATH EXPRESSIONS IN $...$ delimiters. Pay close attention to small details like fractions (e.g. /2), subscripts, and superscripts. DO NOT include the text that has been crossed out or struck through."

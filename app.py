@@ -375,6 +375,7 @@ with tab3:
                     eval_res["filename"] = student.get("filename", "Unknown") # Add filename
                     eval_res["question_text"] = q_ref.get("question_text_plain")
                     eval_res["student_answer"] = ans_text
+                    eval_res["figure_summary_student"] = ans_figs
                     
                     all_evals.append(eval_res)
                     
