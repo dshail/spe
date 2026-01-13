@@ -19,9 +19,7 @@ from utils import (
     list_history_files,
     load_history_file,
     delete_history_file,
-    clear_history_category,
-    convert_datalab_to_markdown,
-    extract_rubric_with_gemini_native
+    clear_history_category
 )
 
 st.set_page_config(page_title="Auto-Grader AI", layout="wide")
@@ -184,40 +182,27 @@ with tab1:
                     tmp.write(uploaded_rubric.getbuffer())
                     rubric_path = tmp.name
                 
-                # Call API - PARSE ONLY (No Schema)
+                # Call API
                 result, error_msg = call_marker_with_structured_extraction(
-                    rubric_path, datalab_key, None
+                    rubric_path, datalab_key, RUBRIC_EXTRACTION_SCHEMA
                 )
                 
                 if result:
-                    # 1. Get Text (Prefer Markdown from Datalab, else convert JSON)
-                    rubric_text = result.get("markdown", "")
-                    if not rubric_text:
-                        # Fallback: Convert structured JSON if markdown missing
-                        rubric_text = convert_datalab_to_markdown(result.get("json"))
-                    
-                    if not rubric_text:
-                         st.error("Datalab returned no content (markdown or json).")
-                    else:
-                        st.toast("✅ PDF Parsed. Extracting Rubric with Gemini...")
+                    rubric, _ = extract_structured_json(result)
+                    if rubric:
+                        rubric = normalize_step_marking(rubric)
+                        st.session_state.rubric_data = rubric
                         
-                        # 2. Extract with Gemini
-                        rubric, gemini_err = extract_rubric_with_gemini_native(model, rubric_text, RUBRIC_EXTRACTION_SCHEMA)
-                        
-                        if rubric:
-                            rubric = normalize_step_marking(rubric)
-                            st.session_state.rubric_data = rubric
-                            
-                            # Auto-save Rubric
-                            saved_path = save_to_history(rubric, "rubrics", "rubric_extracted")
-                            if saved_path:
-                                st.toast(f"💾 Rubric auto-saved to history.")
+                        # Auto-save Rubric
+                        saved_path = save_to_history(rubric, "rubrics", "rubric_extracted")
+                        if saved_path:
+                            st.toast(f"💾 Rubric auto-saved to history.")
 
-                            st.success("✅ Rubric Extracted and Parsed Successfully!")
-                        else:
-                            st.error(f"Gemini Extraction Failed: {gemini_err}")
+                        st.success("✅ Rubric Extracted Successfully!")
+                    else:
+                        st.error("Failed to parse rubric JSON.")
                 else:
-                    st.error(f"Rubric parsing failed: {error_msg}")
+                    st.error(f"Rubric extraction failed: {error_msg}")
                 
                 # Cleanup
                 if os.path.exists(rubric_path):
