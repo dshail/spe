@@ -19,7 +19,9 @@ from utils import (
     list_history_files,
     load_history_file,
     delete_history_file,
-    clear_history_category
+    clear_history_category,
+    convert_datalab_to_markdown,
+    extract_rubric_with_gemini_native
 )
 
 st.set_page_config(page_title="Auto-Grader AI", layout="wide")
@@ -182,13 +184,19 @@ with tab1:
                     tmp.write(uploaded_rubric.getbuffer())
                     rubric_path = tmp.name
                 
-                # Call API
+                # Call API - PARSE ONLY (No Schema)
                 result, error_msg = call_marker_with_structured_extraction(
-                    rubric_path, datalab_key, RUBRIC_EXTRACTION_SCHEMA
+                    rubric_path, datalab_key, None
                 )
                 
                 if result:
-                    rubric, _ = extract_structured_json(result)
+                    # 1. Convert Datalab JSON to Text
+                    st.toast("✅ PDF Parsed. Extracting Rubric with Gemini...")
+                    rubric_text = convert_datalab_to_markdown(result)
+                    
+                    # 2. Extract with Gemini
+                    rubric, gemini_err = extract_rubric_with_gemini_native(model, rubric_text, RUBRIC_EXTRACTION_SCHEMA)
+                    
                     if rubric:
                         rubric = normalize_step_marking(rubric)
                         st.session_state.rubric_data = rubric
@@ -198,11 +206,11 @@ with tab1:
                         if saved_path:
                             st.toast(f"💾 Rubric auto-saved to history.")
 
-                        st.success("✅ Rubric Extracted Successfully!")
+                        st.success("✅ Rubric Extracted and Parsed Successfully!")
                     else:
-                        st.error("Failed to parse rubric JSON.")
+                        st.error(f"Gemini Extraction Failed: {gemini_err}")
                 else:
-                    st.error(f"Rubric extraction failed: {error_msg}")
+                    st.error(f"Rubric parsing failed: {error_msg}")
                 
                 # Cleanup
                 if os.path.exists(rubric_path):

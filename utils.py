@@ -112,7 +112,7 @@ def clear_history_category(category):
 
 RUBRIC_EXTRACTION_SCHEMA = {
     "type": "object",
-    "description": "Complete grading rubric with step-wise marking breakdown",
+    "description": "Complete grading rubric with EXHAUSTIVE, detailed step-wise marking breakdown for EVERY single question.",
     "properties": {
         "exam_metadata": {
             "type": "object",
@@ -142,10 +142,11 @@ RUBRIC_EXTRACTION_SCHEMA = {
         },
         "questions": {
             "type": "array",
+            "description": "List of ALL questions. CRITICAL: Do NOT skip any sub-questions (i, ii, iii...). If a question has parts (e.g. Q1.i, Q1.ii, Q4.A, Q4.B), EXTRACT EACH AS A SEPARATE ITEM. Do not summarize or group.",
             "items": {
                 "type": "object",
                 "properties": {
-                    "question_no": {"type": "string"},
+                    "question_no": {"type": "string", "description": "Exact question number (e.g., '1.i', '4A', '23')."},
                     "section": {"type": "string"},
                     "question_type": {"type": "string"},
                     "difficulty_level": {"type": "string"},
@@ -181,7 +182,7 @@ RUBRIC_EXTRACTION_SCHEMA = {
 
 STUDENT_EXTRACTION_SCHEMA = {
     "type": "object",
-    "description": "Student exam answers with complete text, math, figure, and metadata support",
+    "description": "Student exam answers with complete text, math, figure, and metadata support. EXTRACT ALL ANSWERS FOUND.",
     "properties": {
         "student_metadata": {
             "type": "object",
@@ -194,7 +195,7 @@ STUDENT_EXTRACTION_SCHEMA = {
         },
         "answers": {
             "type": "array",
-            "description": "Complete student answers with text & math. CRITICAL: STRICTLY IGNORE and EXCLUDE any text that is crossed out, struck through, or explicitly cancelled by the student.",
+            "description": "Complete student answers with text & math. CRITICAL: STRICTLY IGNORE and EXCLUDE any text that is crossed out, struck through, or explicitly cancelled by the student. Do not skip any answers found in the script.",
             "items": {
                 "type": "object",
                 "properties": {
@@ -302,6 +303,69 @@ def normalize_step_marking(reference_rubric):
             
     return reference_rubric
 
+# --- GEMINI EXTRACTION HELPER ---
+
+def convert_datalab_to_markdown(json_data):
+    """
+    Flatten Datalab Block JSON tree into a single Markdown/HTML string.
+    This preserves headers and lists which helps the LLM understand structure.
+    """
+    if not json_data:
+        return ""
+        
+    text_parts = []
+    
+    # Recursive function to traverse children
+    def traverse(node):
+        if isinstance(node, dict):
+            # If node has 'html', append it
+            if "html" in node and node["html"]:
+                content = node["html"].strip()
+                if content:
+                    text_parts.append(content)
+            
+            # Recurse into children
+            if "children" in node and isinstance(node["children"], list):
+                for child in node["children"]:
+                    traverse(child)
+    
+    traverse(json_data)
+    
+    return "\n\n".join(text_parts)
+
+def extract_rubric_with_gemini_native(model, rubric_text, schema):
+    """
+    Use Gemini to extract structured Rubric JSON from raw text/markdown.
+    This bypasses Datalab's extraction which might be incomplete.
+    """
+    if not rubric_text:
+        return None, "No text provided for extraction."
+        
+    prompt = f"""You are an Expert Exam Grader AI.
+    
+Your task is to EXTRACT a structured Grading Rubric from the provided Rubric Document content.
+You must capture EVERY SINGLE QUESTION and SUB-QUESTION (e.g. 1(a), 1(b), 2.i, 2.ii).
+DO NOT Summarize or Skip any questions.
+
+Output must be valid JSON matching the following schema:
+{json.dumps(schema)}
+
+DOCUMENT CONTENT:
+{rubric_text}
+"""
+    
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                temperature=0.1
+            )
+        )
+        return json.loads(response.text), None
+    except Exception as e:
+        return None, f"Gemini Extraction Error: {str(e)}"
+
 # --- API CLIENTS ---
 
 def call_marker_with_structured_extraction(filepath, api_key, page_schema, max_retries=3):
@@ -313,11 +377,13 @@ def call_marker_with_structured_extraction(filepath, api_key, page_schema, max_r
             with open(filepath, 'rb') as f:
                 form_data = {
                     'file': (os.path.basename(filepath), f, 'application/pdf'),
-                    'page_schema': (None, json.dumps(page_schema)),
                     'output_format': (None, 'json'),
                     'use_llm': (None, 'true'),
                     'force_ocr': (None, 'true'),
                 }
+                if page_schema:
+                    form_data['page_schema'] = (None, json.dumps(page_schema))
+                
                 headers = {'X-Api-Key': api_key}
                 response = requests.post(DATALAB_MARKER_ENDPOINT, files=form_data, headers=headers)
                 data = response.json()
