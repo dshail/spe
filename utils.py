@@ -362,7 +362,15 @@ DOCUMENT CONTENT:
                 temperature=0.1
             )
         )
-        return json.loads(response.text), None
+        # Use robust parsing logic instead of raw json.loads
+        json_str = extract_json_robust(response.text)
+        data = parse_json_fallbacks(json_str)
+        
+        if data:
+            return data, None
+        else:
+             return None, f"Failed to parse JSON from Gemini response. Raw length: {len(response.text)}"
+             
     except Exception as e:
         return None, f"Gemini Extraction Error: {str(e)}"
 
