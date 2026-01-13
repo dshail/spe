@@ -217,7 +217,7 @@ STUDENT_EXTRACTION_SCHEMA = {
 # --- HELPER FUNCTIONS ---
 
 def normalize_qno(qno: str) -> str:
-    """Normalize question numbers: Q1., 1., 1, 1), 1i, 1I, 1ii, 1ii), Q1I, Q1i), i) -> 1"""
+    """Normalize question numbers: Q1., 1., 1, 1), 1.), 1], 1.], 1.A], 1.A.](i), 1i, 1I, 1ii.), 1ii), Q1I, Q1i), i) -> 1"""
     if not qno:
         return ""
     q = str(qno).strip()
