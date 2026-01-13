@@ -190,25 +190,32 @@ with tab1:
                 )
                 
                 if result:
-                    # 1. Convert Datalab JSON to Text
-                    st.toast("✅ PDF Parsed. Extracting Rubric with Gemini...")
-                    rubric_text = convert_datalab_to_markdown(result)
+                    # 1. Get Text (Prefer Markdown from Datalab, else convert JSON)
+                    rubric_text = result.get("markdown", "")
+                    if not rubric_text:
+                        # Fallback: Convert structured JSON if markdown missing
+                        rubric_text = convert_datalab_to_markdown(result.get("json"))
                     
-                    # 2. Extract with Gemini
-                    rubric, gemini_err = extract_rubric_with_gemini_native(model, rubric_text, RUBRIC_EXTRACTION_SCHEMA)
-                    
-                    if rubric:
-                        rubric = normalize_step_marking(rubric)
-                        st.session_state.rubric_data = rubric
-                        
-                        # Auto-save Rubric
-                        saved_path = save_to_history(rubric, "rubrics", "rubric_extracted")
-                        if saved_path:
-                            st.toast(f"💾 Rubric auto-saved to history.")
-
-                        st.success("✅ Rubric Extracted and Parsed Successfully!")
+                    if not rubric_text:
+                         st.error("Datalab returned no content (markdown or json).")
                     else:
-                        st.error(f"Gemini Extraction Failed: {gemini_err}")
+                        st.toast("✅ PDF Parsed. Extracting Rubric with Gemini...")
+                        
+                        # 2. Extract with Gemini
+                        rubric, gemini_err = extract_rubric_with_gemini_native(model, rubric_text, RUBRIC_EXTRACTION_SCHEMA)
+                        
+                        if rubric:
+                            rubric = normalize_step_marking(rubric)
+                            st.session_state.rubric_data = rubric
+                            
+                            # Auto-save Rubric
+                            saved_path = save_to_history(rubric, "rubrics", "rubric_extracted")
+                            if saved_path:
+                                st.toast(f"💾 Rubric auto-saved to history.")
+
+                            st.success("✅ Rubric Extracted and Parsed Successfully!")
+                        else:
+                            st.error(f"Gemini Extraction Failed: {gemini_err}")
                 else:
                     st.error(f"Rubric parsing failed: {error_msg}")
                 
