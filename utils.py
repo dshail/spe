@@ -216,13 +216,47 @@ STUDENT_EXTRACTION_SCHEMA = {
 
 # --- HELPER FUNCTIONS ---
 
-def normalize_qno(qno: str) -> str:
-    """Normalize question numbers: Q1., 1., 1, 1), 1.), 1], 1.], 1.A], 1.A.](i), 1i, 1I, 1ii.), 1ii), Q1I, Q1i), i) -> 1"""
-    if not qno:
+def normalize_qno(qno_str):
+    """
+    Normalizes inconsistent question identifiers into a standard format: SECTION.QUESTION.SUBQUESTION
+    Example: 'Section-C 7.B (i)' -> 'C.7.B.1'
+    """
+    if not qno_str:
         return ""
-    q = str(qno).strip()
-    q = q.lstrip("Qq").rstrip(".").strip()
-    return q
+
+    # 1. Standardize separators and remove surrounding whitespace/brackets
+    qno_str = str(qno_str).lower().replace('-', '.').replace(')', '').replace('(', '')
+    qno_str = qno_str.replace('section.', '').strip()
+
+    # 2. Conversion table for Roman Numerals to Integers
+    roman_map = {
+        'xii': '12', 'xi': '11', 'x': '10', 'ix': '9', 'viii': '8', 
+        'vii': '7', 'vi': '6', 'v': '5', 'iv': '4', 'iii': '3', 'ii': '2', 'i': '1'
+    }
+
+    # 3. Tokenize by dots or spaces
+    parts = re.split(r'[\s.]+', qno_str)
+    normalized_parts = []
+
+    for part in parts:
+        # Replace roman numerals if they are standalone tokens
+        if part in roman_map:
+            normalized_parts.append(roman_map[part])
+        # Capitalize letters (like 'a', 'b', 'c') for section consistency
+        elif part.isalpha() and len(part) == 1:
+            normalized_parts.append(part.upper())
+        # Keep integers as they are
+        elif part.isdigit():
+            normalized_parts.append(part)
+        else:
+            # Handle mixed alphanumeric like '4A' -> ['4', 'A']
+            match = re.match(r'(\d+)([a-zA-Z]+)', part)
+            if match:
+                normalized_parts.extend([match.group(1), match.group(2).upper()])
+            else:
+                normalized_parts.append(part.upper())
+
+    return ".".join(normalized_parts)
 
 def safe_get_string(obj, key, default=""):
     """Safely get string/list from dict"""
