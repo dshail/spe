@@ -270,7 +270,7 @@ def normalize_step_marking(reference_rubric):
 
 # --- API CLIENTS ---
 
-def call_marker_with_structured_extraction(filepath, api_key, page_schema, max_retries=3):
+def call_marker_with_structured_extraction(filepath, api_key, page_schema, max_retries=3, force_ocr=True):
     """Call Datalab Marker API"""
     DATALAB_MARKER_ENDPOINT = "https://www.datalab.to/api/v1/marker"
     
@@ -282,7 +282,8 @@ def call_marker_with_structured_extraction(filepath, api_key, page_schema, max_r
                     'page_schema': (None, json.dumps(page_schema)),
                     'output_format': (None, 'json'),
                     'use_llm': (None, 'true'),
-                    'force_ocr': (None, 'true'),
+                    'use_llm': (None, 'true'),
+                    'force_ocr': (None, 'true' if force_ocr else 'false'),
                 }
                 headers = {'X-Api-Key': api_key}
                 response = requests.post(DATALAB_MARKER_ENDPOINT, files=form_data, headers=headers)
@@ -330,6 +331,83 @@ def extract_structured_json(marker_result):
         return extracted_data, citations
     except:
         return None, None
+
+def calculate_quality_score(text):
+    """
+    Calculate a heuristic quality score (0.0 to 1.0) for the extracted text.
+    Factors:
+    - Length: Penalize very short text.
+    - Density: Checks for high ratio of undefined/garbage characters.
+    """
+    if not text:
+        return 0.0
+    
+    text_len = len(text.strip())
+    if text_len < 50:
+        return 0.1 # Suspiciously short
+        
+    # Check for garbage (lots of replacement chars or non-ascii if English expected)
+    # Simple heuristic: ratio of alphanumeric to total
+    alphanum = sum(c.isalnum() for c in text)
+    ratio = alphanum / text_len if text_len > 0 else 0
+    
+    if ratio < 0.3: # Mostly symbols/garbage
+        return 0.2
+        
+    return 1.0 # Passes basic checks
+
+def smart_extract_with_routing(filepath, api_key, page_schema):
+    """
+    Conditional Routing Logic:
+    1. Try standard extraction (force_ocr=False) -> Fast, Cheap.
+    2. Check quality of text.
+    3. If quality low, retry with force_ocr=True -> Slow, Robust.
+    """
+    # Attempt 1: Fast Path
+    print(f"DEBUG: Attempting Fast Extraction for {os.path.basename(filepath)}")
+    result, err = call_marker_with_structured_extraction(filepath, api_key, page_schema, max_retries=1, force_ocr=False)
+    
+    should_retry = False
+    
+    if result:
+        # Check Quality
+        extracted_data, _ = extract_structured_json(result)
+        
+        # We need to look at the RAW text quality, but here we only have the JSON.
+        # The 'result' object usually has 'markdown' or 'text' fields if using full marker, 
+        # but structured extraction returns just the JSON.
+        # However, if the JSON is empty or missing keys, that's a quality failure.
+        
+        if not extracted_data:
+             should_retry = True
+             print("DEBUG: Extraction failed (No JSON). Retrying with OCR...")
+        else:
+            # Check content specificness
+            # Rubric: Check if questions exist
+            if "questions" in page_schema["properties"] and not extracted_data.get("questions"):
+                 should_retry = True
+                 print("DEBUG: Rubric has no questions. Retrying with OCR...")
+            
+            # Student: Check if answers exist and have text
+            elif "answers" in page_schema["properties"]:
+                 answers = extracted_data.get("answers", [])
+                 if not answers:
+                      should_retry = True
+                 else:
+                      # Check text density of first few answers
+                      joined_text = " ".join([a.get("answer_text_plain", "") for a in answers[:3]])
+                      score = calculate_quality_score(joined_text)
+                      if score < 0.5:
+                           should_retry = True
+                           print(f"DEBUG: Low Text Quality ({score}). Retrying with OCR...")
+    else:
+        should_retry = True # API error or failure
+    
+    if should_retry:
+         # Attempt 2: OCR Path
+         return call_marker_with_structured_extraction(filepath, api_key, page_schema, max_retries=3, force_ocr=True)
+    
+    return result, err
 
 def extract_json_robust(text):
     """Clean JSON from LLM response"""
