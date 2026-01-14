@@ -9,8 +9,7 @@ from utils import (
     RUBRIC_EXTRACTION_SCHEMA,
     STUDENT_EXTRACTION_SCHEMA,
     normalize_step_marking,
-    normalize_step_marking,
-    smart_extract_with_routing,
+    call_marker_with_structured_extraction,
     extract_structured_json,
     evaluate_single_answer,
     postprocess_evaluation,
@@ -183,8 +182,8 @@ with tab1:
                     tmp.write(uploaded_rubric.getbuffer())
                     rubric_path = tmp.name
                 
-                # Call API (Smart Routing)
-                result, error_msg = smart_extract_with_routing(
+                # Call API
+                result, error_msg = call_marker_with_structured_extraction(
                     rubric_path, datalab_key, RUBRIC_EXTRACTION_SCHEMA
                 )
                 
@@ -267,8 +266,8 @@ with tab2:
                     tmp.write(stu_file.getbuffer())
                     stu_path = tmp.name
                 
-                # Call API (Smart Routing)
-                result, error_msg = smart_extract_with_routing(
+                # Call API
+                result, error_msg = call_marker_with_structured_extraction(
                     stu_path, datalab_key, STUDENT_EXTRACTION_SCHEMA
                 )
                 
