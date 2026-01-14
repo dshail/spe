@@ -281,7 +281,7 @@ def call_marker_with_structured_extraction(filepath, api_key, page_schema, max_r
                     'file': (os.path.basename(filepath), f, 'application/pdf'),
                     'page_schema': (None, json.dumps(page_schema)),
                     'output_format': (None, 'json'),
-                    'use_llm': (None, 'false'),
+                    'use_llm': (None, 'true'),
                     'use_llm': (None, 'true'),
                     'force_ocr': (None, 'true' if force_ocr else 'false'),
                 }
